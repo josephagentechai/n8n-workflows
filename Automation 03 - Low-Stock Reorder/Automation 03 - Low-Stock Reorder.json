@@ -1,0 +1,854 @@
+{
+  "name": "Automation 03 - Low-Stock Reorder",
+  "nodes": [
+    {
+      "id": "a4124315-cb23-427e-aa53-1a9155055c94",
+      "name": "Hourly Stock Scan",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8-18 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6574d987-903f-429e-82da-0564f8b5856f",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "procurement_email",
+              "value": "procurement@example.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "afa52f9c-5d92-4d0a-b94c-4e1b6d72aece",
+      "name": "Read Inventory",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Inventory"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "be9622c3-196e-4838-95c1-93b42298ff1b",
+      "name": "Read Vendors",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Vendors"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a47348c6-89d6-4b3b-90b3-32f62b1e6972",
+      "name": "Check Stock Levels",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Config').first().json;\nconst clean = (v) => String(v ?? '').trim();\nconst money = (n) => Number(n).toFixed(2);\nconst local = $now.setZone('Asia/Singapore');\nconst stamp = local.toFormat('yyyy-MM-dd HH:mm');\nconst poDate = local.toFormat('yyyyMMdd-HHmm');\nconst prefix = cfg.test_mode ? '[TEST] ' : '';\nconst procurement = cfg.test_mode ? cfg.test_email : cfg.procurement_email;\nconst inventory = $('Read Inventory').all().map((i) => i.json).filter((r) => clean(r.sku));\nconst vendors = $('Read Vendors').all().map((i) => i.json).filter((v) => clean(v.sku));\nconst out = [];\nconst orders = {};\nif (inventory.length === 0) {\n  return [{ json: { route: 'exception', logged_at: stamp, sku: '', item: '', problem: 'The Inventory tab returned no rows', to_email: procurement, subject: prefix + 'Stock check problem', body: 'The Inventory tab returned no rows, so stock could not be checked.', lines: [] } }];\n}\nconst addProblem = (r, problem, flag) => out.push({ json: {\n  route: 'exception', logged_at: stamp, sku: clean(r.sku), item: clean(r.item), problem, to_email: procurement,\n  subject: prefix + 'Stock alert needs attention: ' + clean(r.sku),\n  body: 'Item: ' + clean(r.item) + ' (' + clean(r.sku) + ')\\nOn hand: ' + clean(r.qty_on_hand) + '\\nMinimum: ' + clean(r.reorder_min) + '\\n\\nProblem: ' + problem,\n  lines: flag ? [{ sku: clean(r.sku), alert_sent: flag, last_alert: stamp }] : [],\n} });\nfor (const r of inventory) {\n  const qty = Number(r.qty_on_hand);\n  const min = Number(r.reorder_min);\n  const target = Number(clean(r.reorder_target) || r.reorder_min);\n  const flag = clean(r.alert_sent).toLowerCase();\n  if (clean(r.qty_on_hand) === '' || clean(r.reorder_min) === '' || isNaN(qty) || isNaN(min) || isNaN(target)) {\n    if (flag !== 'needs fixing') addProblem(r, 'Quantity or minimum cannot be read', 'needs fixing');\n    continue;\n  }\n  if (qty >= min) {\n    if (flag) out.push({ json: { route: 'restocked', sku: clean(r.sku) } });\n    continue;\n  }\n  if (flag === 'yes') continue;\n  const vendor = vendors.find((v) => clean(v.sku) === clean(r.sku));\n  const price = vendor ? Number(vendor.unit_price_sgd) : NaN;\n  const pack = vendor ? Number(vendor.pack_size) : NaN;\n  if (!vendor || !clean(vendor.vendor_email) || isNaN(price) || !(pack > 0)) {\n    if (flag !== 'vendor missing') addProblem(r, 'No complete approved vendor record for this SKU', 'vendor missing');\n    continue;\n  }\n  const need = Math.max(target - qty, min - qty);\n  const packs = Math.ceil(need / pack);\n  const orderQty = packs * pack;\n  const lineTotal = orderQty * price;\n  const key = clean(vendor.vendor_id);\n  if (!orders[key]) orders[key] = { vendor, lines: [], text: [], total: 0 };\n  orders[key].lines.push({ sku: clean(r.sku), alert_sent: 'yes', last_alert: stamp });\n  orders[key].text.push(clean(r.sku) + ' ' + clean(r.item) + ': ' + packs + ' pack(s) of ' + pack + ' = ' + orderQty + ' units at SGD ' + money(price) + ' = SGD ' + money(lineTotal) + ' (on hand ' + qty + ', minimum ' + min + ')');\n  orders[key].total += lineTotal;\n}\nfor (const key of Object.keys(orders)) {\n  const order = orders[key];\n  const poNumber = 'PO-' + poDate + '-' + key;\n  const lines = order.text.join('\\n');\n  out.unshift({ json: {\n    route: 'po', po_number: poNumber, created_at: stamp, vendor_id: key, vendor_name: clean(order.vendor.vendor_name),\n    vendor_email: clean(order.vendor.vendor_email), po_lines: lines, total_sgd: money(order.total), status: 'Draft', lines: order.lines, to_email: procurement,\n    subject: prefix + 'Reorder draft ' + poNumber + ': ' + clean(order.vendor.vendor_name),\n    body: 'Please review this draft purchase order.\\n\\nPO number: ' + poNumber + '\\nVendor: ' + clean(order.vendor.vendor_name) + ' (' + key + ')\\nContact: ' + clean(order.vendor.contact_name) + ', ' + clean(order.vendor.vendor_email) + '\\n\\n' + lines + '\\n\\nTotal: SGD ' + money(order.total),\n  } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "645237b9-b629-4dd8-9523-725c21a1956c",
+      "name": "Route Stock Result",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1100,
+        400
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "PO",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "po"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Exception",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "exception"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Restocked",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "restocked"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4de968b9-90c5-46b9-b7ff-b952c9b68bd8",
+      "name": "Log PO Draft",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        160
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "PO Drafts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "po_number": "={{ $json.po_number }}",
+            "created_at": "={{ $json.created_at }}",
+            "vendor_id": "={{ $json.vendor_id }}",
+            "vendor_name": "={{ $json.vendor_name }}",
+            "vendor_email": "={{ $json.vendor_email }}",
+            "lines": "={{ $json.po_lines }}",
+            "total_sgd": "={{ $json.total_sgd }}",
+            "status": "={{ $json.status }}"
+          },
+          "schema": [
+            {
+              "id": "po_number",
+              "displayName": "po_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_id",
+              "displayName": "vendor_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_name",
+              "displayName": "vendor_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor_email",
+              "displayName": "vendor_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lines",
+              "displayName": "lines",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_sgd",
+              "displayName": "total_sgd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "89a7017e-6ec2-42ce-a225-8e74a13353ab",
+      "name": "Email Procurement PO",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1580,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Route Stock Result').item.json.to_email }}",
+        "subject": "={{ $('Route Stock Result').item.json.subject }}",
+        "emailType": "text",
+        "message": "={{ $('Route Stock Result').item.json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "606955a1-b9e6-49f1-9f02-09a5d95c6fc1",
+      "name": "Split PO Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1.1,
+      "position": [
+        1580,
+        400
+      ],
+      "parameters": {
+        "fieldToSplitOut": "lines",
+        "include": "noOtherFields",
+        "options": {}
+      }
+    },
+    {
+      "id": "9e2f5e80-4f29-4bf7-9fb4-b7de38357b32",
+      "name": "Log Exception",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        640
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Exceptions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "logged_at": "={{ $json.logged_at }}",
+            "sku": "={{ $json.sku }}",
+            "item": "={{ $json.item }}",
+            "problem": "={{ $json.problem }}"
+          },
+          "schema": [
+            {
+              "id": "logged_at",
+              "displayName": "logged_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sku",
+              "displayName": "sku",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "item",
+              "displayName": "item",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "problem",
+              "displayName": "problem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "16ad6d41-9b95-4060-893e-6a40461ba6af",
+      "name": "Email Vendor Missing",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1580,
+        640
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Route Stock Result').item.json.to_email }}",
+        "subject": "={{ $('Route Stock Result').item.json.subject }}",
+        "emailType": "text",
+        "message": "={{ $('Route Stock Result').item.json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "d8ca061c-0a8e-4658-9d4e-c93f1e915e2a",
+      "name": "Clear Alert Flag",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        860
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Inventory"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "sku"
+          ],
+          "value": {
+            "sku": "={{ $json.sku }}",
+            "alert_sent": ""
+          },
+          "schema": [
+            {
+              "id": "sku",
+              "displayName": "sku",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "item",
+              "displayName": "item",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "qty_on_hand",
+              "displayName": "qty_on_hand",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reorder_min",
+              "displayName": "reorder_min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reorder_target",
+              "displayName": "reorder_target",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alert_sent",
+              "displayName": "alert_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_alert",
+              "displayName": "last_alert",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "56e81fae-993f-4a84-a954-b17775f7ab84",
+      "name": "Mark Alert Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1820,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Inventory"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "sku"
+          ],
+          "value": {
+            "sku": "={{ $json.sku }}",
+            "alert_sent": "={{ $json.alert_sent }}",
+            "last_alert": "={{ $json.last_alert }}"
+          },
+          "schema": [
+            {
+              "id": "sku",
+              "displayName": "sku",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "item",
+              "displayName": "item",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "qty_on_hand",
+              "displayName": "qty_on_hand",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reorder_min",
+              "displayName": "reorder_min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reorder_target",
+              "displayName": "reorder_target",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "alert_sent",
+              "displayName": "alert_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_alert",
+              "displayName": "last_alert",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "0979554d-4961-4771-a89c-fa439dcee09e",
+      "name": "Sticky Note 9be6068a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -420
+      ],
+      "parameters": {
+        "content": "## Automation 03: Low-Stock Reorder Alerts\n\n### Introduction\nEvery hour on weekdays from 8am to 6pm, this workflow checks stock levels and emails procurement a draft purchase order when an item falls below its minimum. No AI is used.\n\n### What to key in\n**Inventory** tab, one row per item: sku, item, category, qty_on_hand, reorder_min, reorder_target. Keep qty_on_hand up to date, and leave alert_sent and last_alert blank.\n**Vendors** tab, one row per item: vendor_id, vendor_name, vendor_email, contact_name, sku, unit_price_sgd, pack_size.\n\n### What happens next\n1. Each item is compared with its minimum.\n2. Low items are grouped by vendor, and order sizes are rounded up to full packs.\n3. The draft is saved in **PO Drafts** and emailed to procurement. It does not go to the vendor.\n4. alert_sent is set to yes, so the same item does not alert again.\n5. After restocking, alert_sent is cleared automatically.\n6. A missing vendor or unreadable number goes to **Exceptions** and procurement once.\n\n### Setup\n1. Connect your Gmail account in **Email Procurement PO** and **Email Vendor Missing**.\n2. In **Config**, enter procurement_email.\n3. Test with test_mode on, which sends every email to test_email.\n4. For live use, set test_mode to false and publish.",
+        "color": 4,
+        "width": 680,
+        "height": 760
+      }
+    }
+  ],
+  "connections": {
+    "Hourly Stock Scan": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Inventory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Inventory": {
+      "main": [
+        [
+          {
+            "node": "Read Vendors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Vendors": {
+      "main": [
+        [
+          {
+            "node": "Check Stock Levels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Stock Levels": {
+      "main": [
+        [
+          {
+            "node": "Route Stock Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Stock Result": {
+      "main": [
+        [
+          {
+            "node": "Log PO Draft",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split PO Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Exception",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split PO Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Alert Flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log PO Draft": {
+      "main": [
+        [
+          {
+            "node": "Email Procurement PO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split PO Items": {
+      "main": [
+        [
+          {
+            "node": "Mark Alert Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Exception": {
+      "main": [
+        [
+          {
+            "node": "Email Vendor Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "pinData": {}
+}

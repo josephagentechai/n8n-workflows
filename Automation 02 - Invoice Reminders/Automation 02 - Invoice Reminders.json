@@ -1,0 +1,599 @@
+{
+  "name": "Automation 02 - Invoice Reminders",
+  "nodes": [
+    {
+      "id": "d9b623e2-01e0-48ea-839d-696c635fe029",
+      "name": "Weekdays 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "100880d9-f57f-4f58-b71d-f936237d9883",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "finance_email",
+              "value": "finance@example.com",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "company_name",
+              "value": "Sample Company Pte Ltd",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "paynow_uen",
+              "value": "200000000X",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "reminder_days",
+              "value": "1,7,14",
+              "type": "string"
+            },
+            {
+              "id": "c7",
+              "name": "min_days_between_reminders",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "c8",
+              "name": "chase_statuses",
+              "value": "Unpaid,Part Paid",
+              "type": "string"
+            },
+            {
+              "id": "c9",
+              "name": "skip_statuses",
+              "value": "Paid,Cancelled,Disputed,On Hold",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "ee25c754-1785-4334-b2c7-92b223edcb5c",
+      "name": "Read Receivables",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        480,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Receivables"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "9d7b1b8f-b569-4bff-bcb8-84bf01e18028",
+      "name": "Pick Invoices to Chase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Config').first().json;\nconst clean = (v) => String(v ?? '').trim();\nconst toISO = (v) => {\n  const s = clean(v).slice(0, 10);\n  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s) && !isNaN(Date.parse(s + 'T00:00:00Z')) ? s : '';\n};\nconst dayGap = (a, b) => Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000);\nconst money = (n) => Number(n).toFixed(2);\nconst local = $now.setZone('Asia/Singapore');\nconst today = local.toFormat('yyyy-MM-dd');\nconst loggedAt = local.toFormat('yyyy-MM-dd HH:mm');\nconst stages = clean(cfg.reminder_days).split(',').map((d) => Number(d.trim())).filter((d) => d > 0);\nconst chase = clean(cfg.chase_statuses).split(',').map((s) => s.trim().toLowerCase());\nconst skip = clean(cfg.skip_statuses).split(',').map((s) => s.trim().toLowerCase());\nconst gap = Number(cfg.min_days_between_reminders) || 5;\nconst rows = $('Read Receivables').all().map((i) => i.json).filter((r) => clean(r.invoice_no));\nconst out = [];\nconst sent = [];\nconst problems = [];\nconst finalNotices = [];\nconst addProblem = (r, problem) => {\n  const row = { route: 'exception', logged_at: loggedAt, invoice_no: clean(r.invoice_no), client_name: clean(r.client_name), problem };\n  out.push({ json: row });\n  problems.push(row);\n};\nfor (const r of rows) {\n  const status = clean(r.status).toLowerCase();\n  if (skip.includes(status)) continue;\n  if (!chase.includes(status)) { addProblem(r, 'Unknown status: ' + (clean(r.status) || 'blank')); continue; }\n  const email = clean(r.client_email);\n  const due = toISO(r.due_date);\n  const amount = Number(r.amount_sgd);\n  const paid = Number(clean(r.paid_sgd) || 0);\n  if (!due) { addProblem(r, 'Due date cannot be read: ' + (clean(r.due_date) || 'blank')); continue; }\n  if (clean(r.amount_sgd) === '' || isNaN(amount) || isNaN(paid)) { addProblem(r, 'Amount cannot be read'); continue; }\n  const owing = amount - paid;\n  if (owing <= 0) { addProblem(r, 'Status is ' + clean(r.status) + ' but nothing is owing'); continue; }\n  const overdue = dayGap(today, due);\n  if (overdue <= 0) continue;\n  if (!/^[^@ ]+@[^@ ]+[.][^@ ]+$/.test(email)) { addProblem(r, 'Client email is missing or invalid'); continue; }\n  const count = Number(clean(r.reminder_count) || 0) || 0;\n  if (count >= stages.length) { finalNotices.push(clean(r.invoice_no) + ' ' + clean(r.client_name) + ': SGD ' + money(owing) + ', ' + overdue + ' days overdue'); continue; }\n  if (overdue < stages[count]) continue;\n  const lastReminded = toISO(r.last_reminded);\n  if (lastReminded && dayGap(today, lastReminded) < gap) continue;\n  const stage = count + 1;\n  const opening = stage === 1 ? 'Our records show this invoice is now past due. If you have already paid, please ignore this note.'\n    : stage === stages.length ? 'This is our final reminder before our finance team calls you.'\n    : 'We have not yet received payment for this invoice.';\n  const body = 'Dear ' + clean(r.client_name) + ',\\n\\n' + opening + '\\n\\n'\n    + 'Invoice: ' + clean(r.invoice_no) + '\\nDue date: ' + due + '\\nAmount owing: SGD ' + money(owing) + '\\n\\n'\n    + 'Pay by PayNow to UEN ' + clean(cfg.paynow_uen) + ' and use ' + clean(r.invoice_no) + ' as the reference.\\n\\n'\n    + 'Thank you,\\n' + clean(cfg.company_name) + ' Finance';\n  const subject = (cfg.test_mode ? '[TEST] ' : '') + 'Payment reminder ' + stage + ' of ' + stages.length + ': invoice ' + clean(r.invoice_no);\n  out.push({ json: { route: 'reminder', invoice_no: clean(r.invoice_no), to_email: cfg.test_mode ? cfg.test_email : email, subject, body, reminder_count: stage, last_reminded: today } });\n  sent.push(clean(r.invoice_no) + ' ' + clean(r.client_name) + ': SGD ' + money(owing) + ', reminder ' + stage);\n}\nconst list = (items) => (items.length ? items.map((t) => '- ' + t).join('\\n') : 'None');\nconst summary = 'Invoice reminder run for ' + today + '\\n\\nInvoices checked: ' + rows.length\n  + '\\n\\nReminders to send (' + sent.length + '):\\n' + list(sent)\n  + '\\n\\nAll reminders used, please call (' + finalNotices.length + '):\\n' + list(finalNotices)\n  + '\\n\\nProblems to fix (' + problems.length + '):\\n' + list(problems.map((p) => p.invoice_no + ': ' + p.problem));\nout.push({ json: { route: 'summary', to_email: cfg.test_mode ? cfg.test_email : cfg.finance_email, subject: (cfg.test_mode ? '[TEST] ' : '') + 'Daily receivables summary: ' + today, body: summary } });\nreturn out;"
+      }
+    },
+    {
+      "id": "80122f69-4198-4c15-96f5-21f84c3efb0a",
+      "name": "Route Invoices",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        960,
+        400
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Reminder",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "reminder"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Exception",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "exception"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Summary",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "summary"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7a5b621d-3ce7-4dfc-906a-23b968a21cb9",
+      "name": "Send Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1220,
+        220
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "29632241-a172-4193-820c-f162250e123e",
+      "name": "Stamp Invoice Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1460,
+        220
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Receivables"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "invoice_no"
+          ],
+          "value": {
+            "invoice_no": "={{ $('Route Invoices').item.json.invoice_no }}",
+            "reminder_count": "={{ $('Route Invoices').item.json.reminder_count }}",
+            "last_reminded": "={{ $('Route Invoices').item.json.last_reminded }}"
+          },
+          "schema": [
+            {
+              "id": "invoice_no",
+              "displayName": "invoice_no",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "client_name",
+              "displayName": "client_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "client_email",
+              "displayName": "client_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "issue_date",
+              "displayName": "issue_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "amount_sgd",
+              "displayName": "amount_sgd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "paid_sgd",
+              "displayName": "paid_sgd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_reminded",
+              "displayName": "last_reminded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "d1120444-dbaa-4c78-89d1-c35a7cf746f9",
+      "name": "Log Exceptions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1220,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Exceptions"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "logged_at": "={{ $json.logged_at }}",
+            "invoice_no": "={{ $json.invoice_no }}",
+            "client_name": "={{ $json.client_name }}",
+            "problem": "={{ $json.problem }}"
+          },
+          "schema": [
+            {
+              "id": "logged_at",
+              "displayName": "logged_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice_no",
+              "displayName": "invoice_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "client_name",
+              "displayName": "client_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "problem",
+              "displayName": "problem",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "3378250b-ed6a-4b13-bcf8-b83f5a3170f6",
+      "name": "Email Finance Summary",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1220,
+        580
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "873ebb25-21a4-4621-97a6-2541ef3a4d4a",
+      "name": "Sticky Note c2e0e69d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -420
+      ],
+      "parameters": {
+        "content": "## Automation 02: Invoice Reminders\n\n### Introduction\nEvery weekday at 9am, this workflow finds overdue invoices, sends staged payment reminders and gives finance a daily summary. No AI is used.\n\n### What to key in\nIn the **Receivables** tab of the Google Sheet, add one row per invoice:\ninvoice_no, client_name, client_email, issue_date, due_date (yyyy-mm-dd), amount_sgd, paid_sgd, status (Unpaid, Part Paid, Paid, Cancelled, Disputed or On Hold), reminder_count (start at 0).\nLeave last_reminded blank.\n\n### What happens next\n1. Only Unpaid and Part Paid invoices are checked.\n2. Reminders go out 1, 7 and 14 days overdue, showing the amount still owing and PayNow details.\n3. The reminder count and date are saved in the row.\n4. After the third reminder, the invoice is listed for finance to call.\n5. Bad dates, missing emails and unknown statuses go to the **Exceptions** tab.\n6. **Email Finance Summary** is always sent, even with 0 overdue.\n\n### Setup\n1. Connect your Gmail account in **Send Reminder** and **Email Finance Summary**.\n2. In **Config**, enter finance_email, company_name and paynow_uen.\n3. Test with test_mode on, which sends every email to test_email.\n4. For live use, set test_mode to false and publish.",
+        "color": 4,
+        "width": 640,
+        "height": 760
+      }
+    }
+  ],
+  "connections": {
+    "Weekdays 9am": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Receivables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Receivables": {
+      "main": [
+        [
+          {
+            "node": "Pick Invoices to Chase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Invoices to Chase": {
+      "main": [
+        [
+          {
+            "node": "Route Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Invoices": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Exceptions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Finance Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reminder": {
+      "main": [
+        [
+          {
+            "node": "Stamp Invoice Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "pinData": {}
+}

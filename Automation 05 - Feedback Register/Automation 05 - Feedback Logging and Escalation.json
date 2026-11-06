@@ -1,0 +1,848 @@
+{
+  "name": "Automation 05 - Feedback Logging and Escalation",
+  "nodes": [
+    {
+      "id": "aa7fd1ce-f16e-4bcb-8b62-23cdc1f67cff",
+      "name": "Feedback Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "authentication": "none",
+        "formTitle": "Customer Feedback",
+        "formDescription": "Tell us how we did. It takes less than a minute.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Account Number",
+              "fieldType": "text",
+              "placeholder": "e.g. AC-2041",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "e.g. name@example.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Score",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "1 - Very poor"
+                  },
+                  {
+                    "option": "2 - Poor"
+                  },
+                  {
+                    "option": "3 - Okay"
+                  },
+                  {
+                    "option": "4 - Good"
+                  },
+                  {
+                    "option": "5 - Excellent"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Comment",
+              "fieldType": "textarea",
+              "placeholder": "Tell us what happened"
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "appendAttribution": false,
+          "ignoreBots": true,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thank you. We have received your feedback."
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "285745e8-486f-4d14-8471-35ef4d45785b",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "manager_name",
+              "value": "Operations Manager",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "manager_email",
+              "value": "operations@example.com",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "company_name",
+              "value": "Sample Company Pte Ltd",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "callback_hours",
+              "value": 24,
+              "type": "number"
+            },
+            {
+              "id": "c7",
+              "name": "case_id",
+              "value": "={{ 'FB-' + $now.setZone('Asia/Singapore').toFormat('yyyyMMdd-HHmmss') + '-' + $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c8",
+              "name": "submitted_at",
+              "value": "={{ $now.setZone('Asia/Singapore').toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c7e5a635-051d-407e-b2c3-37ab074ec830",
+      "name": "Tidy and Sanitise",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Config').first().json;\nconst f = $('Feedback Form').first().json;\nconst clean = (v) => String(v ?? '').replace(/[ \\t]+/g, ' ').trim();\nconst safe = (v) => clean(v).replace(/^[=+@-]+/, '').trim();\nconst score = Number(clean(f['Score']).slice(0, 1));\nconst validScore = Number.isInteger(score) && score >= 1 && score <= 5;\nconst high = !validScore || score <= 2;\nconst hours = Number(cfg.callback_hours) || 24;\nconst due = $now.setZone('Asia/Singapore').plus({ hours }).toFormat('yyyy-MM-dd HH:mm');\nconst sendTo = (real) => (cfg.test_mode ? cfg.test_email : real);\nreturn [{ json: {\n  case_id: cfg.case_id, submitted_at: cfg.submitted_at, account_no: safe(f['Account Number']).toUpperCase(), customer_email: clean(f['Email']).toLowerCase(),\n  score: validScore ? score : clean(f['Score']), comment: safe(f['Comment']), priority: high ? 'High' : 'Standard', status: high ? 'Open' : 'Closed',\n  owner: high ? clean(cfg.manager_name) : '', callback_due: high ? due : '', reminded_at: '', resolved_at: '',\n  to_manager: sendTo(cfg.manager_email), to_customer: sendTo(clean(f['Email'])), subject_prefix: cfg.test_mode ? '[TEST] ' : '',\n} }];"
+      }
+    },
+    {
+      "id": "703d2268-7da9-45e4-82f7-56d84671bba0",
+      "name": "Append to Register",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Register"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "submitted_at": "={{ $json.submitted_at }}",
+            "account_no": "={{ $json.account_no }}",
+            "customer_email": "={{ $json.customer_email }}",
+            "score": "={{ $json.score }}",
+            "comment": "={{ $json.comment }}",
+            "priority": "={{ $json.priority }}",
+            "status": "={{ $json.status }}",
+            "owner": "={{ $json.owner }}",
+            "callback_due": "={{ $json.callback_due }}"
+          },
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "account_no",
+              "displayName": "account_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "comment",
+              "displayName": "comment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "owner",
+              "displayName": "owner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "callback_due",
+              "displayName": "callback_due",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reminded_at",
+              "displayName": "reminded_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "resolved_at",
+              "displayName": "resolved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "a7569bb7-9b61-48e6-b9fa-ca6c94c71708",
+      "name": "Rating 2 or Below?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Tidy and Sanitise').first().json.priority }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "High"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3f611647-ae58-4538-a022-2bfdc9b33d6a",
+      "name": "Alert Operations Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        280
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Tidy and Sanitise').first().json.to_manager }}",
+        "subject": "={{ $('Tidy and Sanitise').first().json.subject_prefix }}High priority feedback: {{ $('Tidy and Sanitise').first().json.case_id }}",
+        "emailType": "text",
+        "message": "=A customer gave a low rating. Please call them back.\n\nCase: {{ $('Tidy and Sanitise').first().json.case_id }}\nAccount: {{ $('Tidy and Sanitise').first().json.account_no }}\nCustomer: {{ $('Tidy and Sanitise').first().json.customer_email }}\nScore: {{ $('Tidy and Sanitise').first().json.score }}\nComment: {{ $('Tidy and Sanitise').first().json.comment }}\nCall back by: {{ $('Tidy and Sanitise').first().json.callback_due }}\n\nAfter the call, set status to Closed and fill resolved_at in the Register tab.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "1e921205-353e-4add-b282-6b4cabc2ea21",
+      "name": "Apology to Customer",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        280
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Tidy and Sanitise').first().json.to_customer }}",
+        "subject": "={{ $('Tidy and Sanitise').first().json.subject_prefix }}We are sorry about your experience",
+        "emailType": "text",
+        "message": "=Hello,\n\nThank you for telling us about your experience, and we are sorry we fell short.\n\nA manager will call you within {{ $('Config').first().json.callback_hours }} hours. Your reference is {{ $('Tidy and Sanitise').first().json.case_id }}.\n\nKind regards,\n{{ $('Config').first().json.company_name }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "8c3979d7-d3e6-4498-98e3-44043f6b1dc2",
+      "name": "Thank-You to Customer",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        520
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Tidy and Sanitise').first().json.to_customer }}",
+        "subject": "={{ $('Tidy and Sanitise').first().json.subject_prefix }}Thank you for your feedback",
+        "emailType": "text",
+        "message": "=Hello,\n\nThank you for your feedback and for your business.\n\nKind regards,\n{{ $('Config').first().json.company_name }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "51657dae-6263-4e20-952f-d43565041345",
+      "name": "Weekdays 9am Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        760
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0996dd98-f961-41ea-a47e-b87ddce3d918",
+      "name": "Reminder Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        760
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "manager_email",
+              "value": "operations@example.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3bc4ebb2-8762-476c-8e6e-19f24ef6c335",
+      "name": "Read Open Cases",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        760
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Register"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "373bbb23-f1b2-462c-9524-b11799b3d3ef",
+      "name": "Find Overdue Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Reminder Config').first().json;\nconst clean = (v) => String(v ?? '').trim();\nconst local = $now.setZone('Asia/Singapore');\nconst stamp = local.toFormat('yyyy-MM-dd HH:mm');\nconst nowMs = local.toMillis();\nconst parse = (s) => Date.parse(clean(s).replace(' ', 'T') + ':00+08:00');\nconst out = [];\nfor (const item of $('Read Open Cases').all()) {\n  const c = item.json;\n  if (clean(c.priority) !== 'High' || clean(c.status) !== 'Open' || clean(c.resolved_at)) continue;\n  const due = parse(c.callback_due);\n  if (isNaN(due) || nowMs < due) continue;\n  if (clean(c.reminded_at) && (nowMs - parse(c.reminded_at)) / 3600000 < 23) continue;\n  out.push({ json: {\n    case_id: clean(c.case_id), reminded_at: stamp, to_email: cfg.test_mode ? cfg.test_email : cfg.manager_email,\n    subject: (cfg.test_mode ? '[TEST] ' : '') + 'Callback overdue: ' + clean(c.case_id),\n    body: 'Case: ' + clean(c.case_id) + '\\nAccount: ' + clean(c.account_no) + '\\nCustomer: ' + clean(c.customer_email) + '\\nScore: ' + clean(c.score) + '\\nComment: ' + clean(c.comment) + '\\nCallback was due: ' + clean(c.callback_due) + '\\n\\nPlease call the customer, then set status to Closed and fill resolved_at in the Register tab.',\n  } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "7d3b1ec9-9681-4907-bdc7-d36ff123507f",
+      "name": "Remind Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "dfe4b2f0-f51a-4e0c-b7be-a3345558e51d",
+      "name": "Stamp Reminder",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        760
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Register"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "case_id"
+          ],
+          "value": {
+            "case_id": "={{ $('Find Overdue Cases').item.json.case_id }}",
+            "reminded_at": "={{ $('Find Overdue Cases').item.json.reminded_at }}"
+          },
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "account_no",
+              "displayName": "account_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "customer_email",
+              "displayName": "customer_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "comment",
+              "displayName": "comment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "owner",
+              "displayName": "owner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "callback_due",
+              "displayName": "callback_due",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reminded_at",
+              "displayName": "reminded_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resolved_at",
+              "displayName": "resolved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "fa797f20-dceb-490a-bf2d-1d2f7bd36aa8",
+      "name": "Sticky Note f5f1deab",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -380
+      ],
+      "parameters": {
+        "content": "## Automation 05: Feedback Logging and Escalation\n\n### Introduction\nLogs every customer feedback form in one register, replies to the customer straight away and alerts the manager about low ratings. No AI is used.\n\n### What to key in\nThe customer fills in **Feedback Form**: Account Number, Email, Score from 1 to 5, and Comment.\nAfter a callback, staff set status to Closed and fill resolved_at in the **Register** tab.\n\n### What happens next\n1. The answers are tidied and saved in the **Register** tab.\n2. Score 2 or below: the manager is alerted, and the customer gets an apology with a reference number.\n3. Score 3 or above: the customer gets a thank-you note.\n4. Each weekday at 9am, the manager is reminded about any open case past its callback time.\n\n### Setup\n1. Connect your Gmail account in all four Gmail nodes.\n2. In **Config** and **Reminder Config**, enter the manager details and company name.\n3. Test with test_mode on in both, which sends every email to test_email.\n4. For live use, set test_mode to false in both, then publish.\n5. Share the Production URL from **Feedback Form** with customers.",
+        "color": 4,
+        "width": 640,
+        "height": 720
+      }
+    }
+  ],
+  "connections": {
+    "Feedback Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Tidy and Sanitise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tidy and Sanitise": {
+      "main": [
+        [
+          {
+            "node": "Append to Register",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Register": {
+      "main": [
+        [
+          {
+            "node": "Rating 2 or Below?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rating 2 or Below?": {
+      "main": [
+        [
+          {
+            "node": "Alert Operations Manager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Thank-You to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Operations Manager": {
+      "main": [
+        [
+          {
+            "node": "Apology to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekdays 9am Check": {
+      "main": [
+        [
+          {
+            "node": "Reminder Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reminder Config": {
+      "main": [
+        [
+          {
+            "node": "Read Open Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Open Cases": {
+      "main": [
+        [
+          {
+            "node": "Find Overdue Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Overdue Cases": {
+      "main": [
+        [
+          {
+            "node": "Remind Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remind Manager": {
+      "main": [
+        [
+          {
+            "node": "Stamp Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "pinData": {}
+}

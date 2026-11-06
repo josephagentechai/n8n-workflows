@@ -1,0 +1,67 @@
+{
+  "name": "Automation Error Alert",
+  "nodes": [
+    {
+      "id": "21166cd0-373d-4fb6-8f4c-5420b94eb33b",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        420
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9b0f0305-daf5-4412-9630-bf0e557ced63",
+      "name": "Send Failure Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        420
+      ],
+      "parameters": {
+        "chatId": "PASTE_YOUR_TELEGRAM_CHAT_ID",
+        "text": "=⚠️ Automation workflow failed\nWorkflow: {{ $json.workflow.name }}\nNode: {{ $json.execution.lastNodeExecuted }}\nError: {{ $json.execution.error.message }}\n{{ $json.execution.url }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      }
+    },
+    {
+      "id": "b5b2cdbc-9135-4661-90a0-feb529f96cee",
+      "name": "Sticky Note 714a94eb",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -60
+      ],
+      "parameters": {
+        "content": "## Automation Error Alert\n\n### Introduction\nSends you a Telegram message when any of the five Automation workflows fails, so a failure is never silent.\n\n### What to key in\nNothing. It runs by itself.\n\n### What happens next\n1. A workflow fails.\n2. **Error Trigger** receives the failure details.\n3. **Send Failure Alert** sends the workflow name, failed node, error and a link to the run.\n\n### Setup\n1. Publish this workflow, because an unpublished error workflow cannot run.\n2. To alert a different chat, change Chat ID in **Send Failure Alert**.",
+        "color": 5,
+        "width": 560,
+        "height": 420
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "pinData": {}
+}

@@ -1,0 +1,1116 @@
+{
+  "name": "Automation 04 - Lead Capture and Routing",
+  "nodes": [
+    {
+      "id": "0d23ea9d-f2b4-42a1-b981-f1170ac0c6cc",
+      "name": "Lead Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "authentication": "none",
+        "formTitle": "Talk to Our Team",
+        "formDescription": "Tell us what you need and the right person will contact you.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Full Name",
+              "fieldType": "text",
+              "placeholder": "e.g. Mary Tan",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "e.g. name@example.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone",
+              "fieldType": "text",
+              "placeholder": "e.g. +65 XXXX XXXX",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company",
+              "fieldType": "text",
+              "placeholder": "e.g. Sample Pte Ltd",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Country",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Singapore"
+                  },
+                  {
+                    "option": "Malaysia"
+                  },
+                  {
+                    "option": "Indonesia"
+                  },
+                  {
+                    "option": "Thailand"
+                  },
+                  {
+                    "option": "Other"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Postal Code",
+              "fieldType": "text",
+              "placeholder": "e.g. 238801"
+            },
+            {
+              "fieldLabel": "Budget",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Below SGD 5,000"
+                  },
+                  {
+                    "option": "SGD 5,000 to 20,000"
+                  },
+                  {
+                    "option": "Above SGD 20,000"
+                  },
+                  {
+                    "option": "Not sure yet"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Enquiry",
+              "fieldType": "textarea",
+              "placeholder": "How can we help?",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "PDPA Consent",
+              "fieldType": "checkbox",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "I agree that you may use these details to respond to my enquiry."
+                  }
+                ]
+              }
+            },
+            {
+              "fieldType": "hiddenField",
+              "fieldName": "website_url",
+              "fieldValue": ""
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "appendAttribution": false,
+          "ignoreBots": true,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thank you. We will be in touch shortly."
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "37d0eae3-ba00-4a50-b46c-9baeee121c64",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "company_name",
+              "value": "Sample Company Pte Ltd",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "fallback_rep_name",
+              "value": "Sales Team",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "fallback_rep_email",
+              "value": "sales@example.com",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "fallback_rep_phone",
+              "value": "PASTE_YOUR_FALLBACK_REP_PHONE",
+              "type": "string"
+            },
+            {
+              "id": "c7",
+              "name": "duplicate_window_days",
+              "value": 90,
+              "type": "number"
+            },
+            {
+              "id": "c8",
+              "name": "lead_id",
+              "value": "={{ 'L-' + $now.setZone('Asia/Singapore').toFormat('yyyyMMdd-HHmmss') + '-' + $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c9",
+              "name": "submitted_at",
+              "value": "={{ $now.setZone('Asia/Singapore').toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b6c819c5-52aa-4a99-8dfe-e5278857fd1a",
+      "name": "Read Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ff81dfcd-b366-4cab-ae4d-3733869bbf51",
+      "name": "Read Territories",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Territories"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "bfdd0119-59f2-45f8-93c1-6a5ea9f59f36",
+      "name": "Check and Route Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Config').first().json;\nconst f = $('Lead Form').first().json;\nconst clean = (v) => String(v ?? '').trim();\nconst safe = (v) => clean(v).replace(/^[=+@-]+/, '').trim();\nconst leads = $('Read Leads').all().map((i) => i.json).filter((l) => clean(l.lead_id));\nconst email = clean(f['Email']).toLowerCase();\nconst country = safe(f['Country']);\nconst postal = clean(f['Postal Code']).replace(/[^0-9A-Za-z]/g, '');\nconst phone = clean(f['Phone']).replace(/[^0-9+() -]/g, '');\nconst consent = Array.isArray(f['PDPA Consent']) ? f['PDPA Consent'].length > 0 : clean(f['PDPA Consent']) !== '';\nconst trap = clean(f['website_url']);\nconst name = safe(f['Full Name']);\nconst enquiry = safe(f['Enquiry']);\nconst sendTo = (real) => (cfg.test_mode ? cfg.test_email : real);\nconst base = {\n  lead_id: cfg.lead_id, submitted_at: cfg.submitted_at, name, email, phone, company: safe(f['Company']), country,\n  postal_code: postal, budget: safe(f['Budget']), enquiry, pdpa_consent: consent ? 'Yes' : 'No', contacted_at: '', reminded_at: '',\n  subject_prefix: cfg.test_mode ? '[TEST] ' : '',\n};\nconst fallback = { rep_name: clean(cfg.fallback_rep_name), rep_email: clean(cfg.fallback_rep_email), rep_phone: clean(cfg.fallback_rep_phone) };\nconst done = (outcome, rep) => [{ json: { ...base, outcome, status: outcome === 'New' ? 'New' : 'Closed', rep_name: rep.rep_name, rep_email: rep.rep_email, rep_phone: rep.rep_phone, to_rep: sendTo(rep.rep_email), to_prospect: sendTo(email) } }];\nconst none = { rep_name: '', rep_email: '', rep_phone: '' };\nconst validEmail = /^[^@ ]+@[^@ ]+[.][^@ ]+$/.test(email);\nconst hasLink = /https?:|www[.]/i.test(name);\nif (trap || !validEmail || hasLink) return done('Spam', none);\nif (!consent) return done('No Consent', none);\nconst windowDays = Number(cfg.duplicate_window_days) || 90;\nconst nowMs = Date.parse(clean(cfg.submitted_at).replace(' ', 'T') + ':00+08:00');\nconst prior = leads.filter((l) => clean(l.email).toLowerCase() === email && clean(l.outcome) === 'New').find((l) => {\n  const seen = Date.parse(clean(l.submitted_at).replace(' ', 'T') + ':00+08:00');\n  return !isNaN(seen) && (nowMs - seen) / 86400000 <= windowDays;\n});\nif (prior) return done('Duplicate', { rep_name: clean(prior.rep_name), rep_email: clean(prior.rep_email), rep_phone: '' });\nconst territories = $('Read Territories').all().map((i) => i.json)\n  .filter((t) => clean(t.active).toLowerCase() === 'yes' && clean(t.country).toLowerCase() === country.toLowerCase());\nconst prefixMatches = territories.filter((t) => clean(t.postal_prefix) && postal.startsWith(clean(t.postal_prefix)));\nconst longest = prefixMatches.reduce((m, t) => Math.max(m, clean(t.postal_prefix).length), 0);\nlet pool = prefixMatches.filter((t) => clean(t.postal_prefix).length === longest);\nif (pool.length === 0) pool = territories.filter((t) => !clean(t.postal_prefix));\nif (pool.length === 0) return done('New', fallback);\nconst load = (rep) => leads.filter((l) => clean(l.rep_email).toLowerCase() === clean(rep.rep_email).toLowerCase() && clean(l.outcome) === 'New').length;\nconst chosen = pool.slice().sort((a, b) => load(a) - load(b))[0];\nreturn done('New', { rep_name: clean(chosen.rep_name), rep_email: clean(chosen.rep_email), rep_phone: clean(chosen.rep_phone) });"
+      }
+    },
+    {
+      "id": "15774093-125b-4c20-96e2-cca7a89461fa",
+      "name": "Log Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1100,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "lead_id": "={{ $json.lead_id }}",
+            "submitted_at": "={{ $json.submitted_at }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "company": "={{ $json.company }}",
+            "country": "={{ $json.country }}",
+            "postal_code": "={{ $json.postal_code }}",
+            "budget": "={{ $json.budget }}",
+            "enquiry": "={{ $json.enquiry }}",
+            "pdpa_consent": "={{ $json.pdpa_consent }}",
+            "outcome": "={{ $json.outcome }}",
+            "rep_name": "={{ $json.rep_name }}",
+            "rep_email": "={{ $json.rep_email }}",
+            "status": "={{ $json.status }}"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "country",
+              "displayName": "country",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "postal_code",
+              "displayName": "postal_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget",
+              "displayName": "budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "enquiry",
+              "displayName": "enquiry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pdpa_consent",
+              "displayName": "pdpa_consent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rep_name",
+              "displayName": "rep_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rep_email",
+              "displayName": "rep_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contacted_at",
+              "displayName": "contacted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reminded_at",
+              "displayName": "reminded_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "4165b134-88a7-4689-9b89-ebf9b20c8db4",
+      "name": "Lead Outcome",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1320,
+        400
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "New",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Check and Route Lead').first().json.outcome }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "New"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Duplicate",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Check and Route Lead').first().json.outcome }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Duplicate"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "eed32ed3-f551-4e9a-9d44-1f30e9e03ce1",
+      "name": "Alert Assigned Rep",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        280
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Check and Route Lead').first().json.to_rep }}",
+        "subject": "={{ $('Check and Route Lead').first().json.subject_prefix }}New lead: {{ $('Check and Route Lead').first().json.name }}, {{ $('Check and Route Lead').first().json.company }}",
+        "emailType": "text",
+        "message": "=Hi {{ $('Check and Route Lead').first().json.rep_name }},\n\nYou have a new lead.\n\nName: {{ $('Check and Route Lead').first().json.name }}\nCompany: {{ $('Check and Route Lead').first().json.company }}\nPhone: {{ $('Check and Route Lead').first().json.phone }}\nEmail: {{ $('Check and Route Lead').first().json.email }}\nCountry: {{ $('Check and Route Lead').first().json.country }}\nBudget: {{ $('Check and Route Lead').first().json.budget }}\nEnquiry: {{ $('Check and Route Lead').first().json.enquiry }}\n\nAfter contacting them, set status to Contacted in the Leads tab.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "946bc7af-059f-4e47-87ae-d0927002e90d",
+      "name": "Acknowledge Prospect",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        280
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Check and Route Lead').first().json.to_prospect }}",
+        "subject": "={{ $('Check and Route Lead').first().json.subject_prefix }}Thanks for contacting {{ $('Config').first().json.company_name }}",
+        "emailType": "text",
+        "message": "=Hi {{ $('Check and Route Lead').first().json.name }},\n\nThank you for your enquiry. {{ $('Check and Route Lead').first().json.rep_name }} will contact you shortly.\n\nDirect contact:\n{{ $('Check and Route Lead').first().json.rep_name }}\n{{ $('Check and Route Lead').first().json.rep_email }}\n{{ $('Check and Route Lead').first().json.rep_phone }}\n\nKind regards,\n{{ $('Config').first().json.company_name }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "dd89fdbd-c8bd-44dc-af51-65b388a57c01",
+      "name": "Alert Rep Repeat Enquiry",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        520
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Check and Route Lead').first().json.to_rep }}",
+        "subject": "={{ $('Check and Route Lead').first().json.subject_prefix }}Repeat enquiry: {{ $('Check and Route Lead').first().json.name }}",
+        "emailType": "text",
+        "message": "=Hi {{ $('Check and Route Lead').first().json.rep_name }},\n\nA lead you already own has enquired again.\n\nName: {{ $('Check and Route Lead').first().json.name }}\nEmail: {{ $('Check and Route Lead').first().json.email }}\nPhone: {{ $('Check and Route Lead').first().json.phone }}\nEnquiry: {{ $('Check and Route Lead').first().json.enquiry }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "0348c7c8-2ebf-47a4-8b64-6d00c55ce3e0",
+      "name": "Weekdays 9am Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        760
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fa181e99-b0aa-4904-a96c-ea44d07b6858",
+      "name": "Reminder Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        760
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "r2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "contact_limit_hours",
+              "value": 24,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b44d3e00-c1be-4f89-b003-295a9ceff803",
+      "name": "Read Open Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        760
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a3a181b5-5dda-4b67-b68d-2c359f3bac08",
+      "name": "Find Overdue Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Reminder Config').first().json;\nconst clean = (v) => String(v ?? '').trim();\nconst local = $now.setZone('Asia/Singapore');\nconst stamp = local.toFormat('yyyy-MM-dd HH:mm');\nconst nowMs = local.toMillis();\nconst limit = Number(cfg.contact_limit_hours) || 24;\nconst parse = (s) => Date.parse(clean(s).replace(' ', 'T') + ':00+08:00');\nconst out = [];\nfor (const item of $('Read Open Leads').all()) {\n  const l = item.json;\n  if (clean(l.outcome) !== 'New' || clean(l.status) !== 'New' || clean(l.contacted_at)) continue;\n  const age = (nowMs - parse(l.submitted_at)) / 3600000;\n  if (isNaN(age) || age < limit) continue;\n  if (clean(l.reminded_at) && (nowMs - parse(l.reminded_at)) / 3600000 < limit - 1) continue;\n  out.push({ json: {\n    lead_id: clean(l.lead_id), reminded_at: stamp, to_email: cfg.test_mode ? cfg.test_email : clean(l.rep_email),\n    subject: (cfg.test_mode ? '[TEST] ' : '') + 'Lead not yet contacted: ' + clean(l.name),\n    body: 'Hi ' + clean(l.rep_name) + ',\\n\\nThis lead has waited ' + Math.floor(age) + ' hours.\\n\\nName: ' + clean(l.name) + '\\nCompany: ' + clean(l.company) + '\\nPhone: ' + clean(l.phone) + '\\nEmail: ' + clean(l.email) + '\\n\\nPlease contact them, then set status to Contacted in the Leads tab.',\n  } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "7d5e6915-5685-49eb-88c9-b665f4eef7b6",
+      "name": "Remind Rep",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.to_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "688a799e-9772-4aac-8e75-9c5eb50a0084",
+      "name": "Stamp Reminder",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1100,
+        760
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "lead_id"
+          ],
+          "value": {
+            "lead_id": "={{ $('Find Overdue Leads').item.json.lead_id }}",
+            "reminded_at": "={{ $('Find Overdue Leads').item.json.reminded_at }}"
+          },
+          "schema": [
+            {
+              "id": "lead_id",
+              "displayName": "lead_id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "country",
+              "displayName": "country",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "postal_code",
+              "displayName": "postal_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "budget",
+              "displayName": "budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "enquiry",
+              "displayName": "enquiry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "pdpa_consent",
+              "displayName": "pdpa_consent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "rep_name",
+              "displayName": "rep_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "rep_email",
+              "displayName": "rep_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "contacted_at",
+              "displayName": "contacted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reminded_at",
+              "displayName": "reminded_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "f8853e10-6662-4ec1-93f6-c2afa92f0d57",
+      "name": "Sticky Note a5b05501",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -460
+      ],
+      "parameters": {
+        "content": "## Automation 04: Lead Capture and Routing\n\n### Introduction\nLogs each new enquiry, assigns one rep by country and postal code, and replies to the prospect within seconds. No AI is used.\n\n### What to key in\nThe prospect fills in **Lead Form**: name, email, phone, company, country, postal code, budget, enquiry and PDPA consent.\nStaff keep reps in the **Territories** tab: country, postal_prefix (blank means the whole country), rep details and active (yes or no).\nAfter contact, the rep sets status to Contacted in the **Leads** tab.\n\n### What happens next\n1. Spam is logged and stopped. The form has basic filters only, with no CAPTCHA.\n2. A repeat email within 90 days goes to the existing rep, not a second one.\n3. A new lead goes to the matching rep, sharing evenly if several match.\n4. No match goes to the fallback rep in **Config**.\n5. The rep gets the lead details, and the prospect gets the rep contact card.\n6. Each weekday at 9am, reps are reminded about leads not contacted within 24 hours.\n\n### Setup\n1. Connect your Gmail account in all four Gmail nodes.\n2. In **Config**, enter company_name and the fallback rep.\n3. Test with test_mode on in **Config** and **Reminder Config**, which sends every email to test_email.\n4. For live use, set test_mode to false in both, then publish.\n5. Share the Production URL from **Lead Form**.",
+        "color": 4,
+        "width": 680,
+        "height": 800
+      }
+    }
+  ],
+  "connections": {
+    "Lead Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Leads": {
+      "main": [
+        [
+          {
+            "node": "Read Territories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Territories": {
+      "main": [
+        [
+          {
+            "node": "Check and Route Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check and Route Lead": {
+      "main": [
+        [
+          {
+            "node": "Log Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead": {
+      "main": [
+        [
+          {
+            "node": "Lead Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Outcome": {
+      "main": [
+        [
+          {
+            "node": "Alert Assigned Rep",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Rep Repeat Enquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Assigned Rep": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekdays 9am Check": {
+      "main": [
+        [
+          {
+            "node": "Reminder Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reminder Config": {
+      "main": [
+        [
+          {
+            "node": "Read Open Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Open Leads": {
+      "main": [
+        [
+          {
+            "node": "Find Overdue Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Overdue Leads": {
+      "main": [
+        [
+          {
+            "node": "Remind Rep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remind Rep": {
+      "main": [
+        [
+          {
+            "node": "Stamp Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "pinData": {}
+}

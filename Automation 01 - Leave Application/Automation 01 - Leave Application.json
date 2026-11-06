@@ -1,0 +1,1953 @@
+{
+  "name": "Automation 01 - Leave Application",
+  "nodes": [
+    {
+      "id": "7aee5feb-0cd5-4453-b059-ecdfa985624f",
+      "name": "Leave Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        500
+      ],
+      "parameters": {
+        "authentication": "basicAuth",
+        "formTitle": "Leave Application",
+        "formDescription": "Fill in this form to apply for leave.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Employee ID",
+              "fieldType": "text",
+              "placeholder": "e.g. E1001",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Work Email",
+              "fieldType": "email",
+              "placeholder": "e.g. name@example.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Leave Type",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Annual Leave"
+                  },
+                  {
+                    "option": "Sick Leave"
+                  },
+                  {
+                    "option": "Childcare Leave"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Start Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "End Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Day Portion",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Full Day"
+                  },
+                  {
+                    "option": "Half Day (AM)"
+                  },
+                  {
+                    "option": "Half Day (PM)"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Reason",
+              "fieldType": "textarea",
+              "placeholder": "e.g. Family trip"
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "appendAttribution": false,
+          "ignoreBots": true,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thank you. Please check your email for the result."
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "01f59be6-e976-4126-9219-e8cd6cd07bc1",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        500
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c2",
+              "name": "test_email",
+              "value": "PASTE_YOUR_TEST_EMAIL",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "hr_email",
+              "value": "hr@example.com",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "company_name",
+              "value": "Sample Company Pte Ltd",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "request_id",
+              "value": "={{ 'LV-' + $now.setZone('Asia/Singapore').toFormat('yyyyMMdd-HHmmss') + '-' + $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c6",
+              "name": "submitted_at",
+              "value": "={{ $now.setZone('Asia/Singapore').toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b4ede51f-aee3-4999-8a09-201a378872c8",
+      "name": "Log Raw Submission",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        500
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "request_id": "={{ $json.request_id }}",
+            "submitted_at": "={{ $json.submitted_at }}",
+            "employee_id": "={{ $('Leave Form').first().json['Employee ID'] }}",
+            "work_email": "={{ $('Leave Form').first().json['Work Email'] }}",
+            "leave_type": "={{ $('Leave Form').first().json['Leave Type'] }}",
+            "start_date": "={{ $('Leave Form').first().json['Start Date'] }}",
+            "end_date": "={{ $('Leave Form').first().json['End Date'] }}",
+            "day_portion": "={{ $('Leave Form').first().json['Day Portion'] }}",
+            "reason": "={{ $('Leave Form').first().json['Reason'] }}",
+            "status": "Received"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leave_type",
+              "displayName": "leave_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_portion",
+              "displayName": "day_portion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "5918b545-2201-4fe5-a79b-890a996e0dce",
+      "name": "Read Employees",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        500
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Employees"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "8ff5da9f-366f-4496-bf97-d99761c03534",
+      "name": "Read Holidays",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        880,
+        500
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Holidays"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "eeeeb4dc-65ea-4c83-80b9-9e5de0dfd140",
+      "name": "Read Leave Requests",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1100,
+        500
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b12a8267-eea1-44b9-96d4-eb64f0d015c8",
+      "name": "Validate and Count Days",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        500
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cfg = $('Config').first().json;\nconst f = $('Leave Form').first().json;\nconst clean = (v) => String(v ?? '').trim();\nconst toISO = (v) => {\n  const s = clean(v).slice(0, 10);\n  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s) && !isNaN(Date.parse(s + 'T00:00:00Z')) ? s : '';\n};\nconst rows = (name) => $(name).all().map((i) => i.json);\nconst hasFn = (o, k) => clean(o[k]) !== '';\nconst employeeId = clean(f['Employee ID']).toUpperCase();\nconst workEmail = clean(f['Work Email']).toLowerCase();\nconst leaveType = clean(f['Leave Type']);\nconst start = toISO(f['Start Date']);\nconst end = toISO(f['End Date']);\nconst portion = clean(f['Day Portion']) || 'Full Day';\nconst reason = clean(f['Reason']);\nconst columns = { 'Annual Leave': 'annual_leave', 'Sick Leave': 'sick_leave', 'Childcare Leave': 'childcare_leave' };\nconst emp = rows('Read Employees').find((e) => clean(e.employee_id).toUpperCase() === employeeId);\nconst sendTo = (real) => (cfg.test_mode ? cfg.test_email : real);\nconst base = {\n  request_id: cfg.request_id, submitted_at: cfg.submitted_at, employee_id: employeeId, work_email: workEmail,\n  employee_name: emp ? clean(emp.name) : '', manager_email: emp ? clean(emp.manager_email) : '',\n  leave_type: leaveType, start_date: start, end_date: end, day_portion: portion, reason,\n  subject_prefix: cfg.test_mode ? '[TEST] ' : '', to_employee: sendTo(emp ? clean(emp.work_email) : workEmail),\n  to_manager: sendTo(emp ? clean(emp.manager_email) : ''), to_hr: sendTo(cfg.hr_email), days: 0,\n};\nconst reject = (message, days = 0) => [{ json: { ...base, days, eligible: false, decision_reason: message } }];\nif (!emp) return reject('We could not find that Employee ID. Please check it and apply again.');\nif (clean(emp.work_email).toLowerCase() !== workEmail) return reject('Your Employee ID and work email do not match our records.');\nconst balanceColumn = columns[leaveType];\nif (!balanceColumn) return reject('That leave type is not recognised. Please contact HR.');\nif (!start || !end) return reject('The dates could not be read. Please apply again.');\nif (end < start) return reject('The end date is before the start date.');\nconst halfDay = portion !== 'Full Day';\nif (halfDay && start !== end) return reject('A half day must start and end on the same date.');\nconst holidays = new Set(rows('Read Holidays').map((h) => toISO(h.date)).filter(Boolean));\nlet days = 0;\nlet cursor = new Date(start + 'T00:00:00Z');\nconst last = new Date(end + 'T00:00:00Z');\nwhile (cursor <= last) {\n  const iso = cursor.toISOString().slice(0, 10);\n  const weekday = cursor.getUTCDay();\n  if (weekday !== 0 && weekday !== 6 && !holidays.has(iso)) days += 1;\n  cursor = new Date(cursor.getTime() + 86400000);\n}\nif (halfDay && days > 0) days = 0.5;\nif (days === 0) return reject('The dates chosen fall on weekends or public holidays, so there are no working days to apply for.');\nconst others = rows('Read Leave Requests').filter((r) => clean(r.employee_id).toUpperCase() === employeeId && clean(r.request_id) !== cfg.request_id);\nconst active = others.filter((r) => ['Pending', 'Approved'].includes(clean(r.status)));\nconst clash = active.find((r) => toISO(r.start_date) <= end && toISO(r.end_date) >= start);\nif (clash) return reject('These dates overlap request ' + clean(clash.request_id) + ' (' + clean(clash.status) + ').', days);\nconst balance = Number(emp[balanceColumn]);\nif (!hasFn(emp, balanceColumn) || isNaN(balance)) return reject('No ' + leaveType + ' balance is on record. Please contact HR.', days);\nconst pending = others.filter((r) => clean(r.status) === 'Pending' && clean(r.leave_type) === leaveType).reduce((sum, r) => sum + (Number(r.days) || 0), 0);\nconst available = balance - pending;\nif (days > available) return reject('Insufficient ' + leaveType + ': you asked for ' + days + ' day(s) but only ' + available + ' are available (balance ' + balance + ', pending ' + pending + ').', days);\nreturn [{ json: { ...base, days, eligible: true, decision_reason: '', balance_before: balance, available_after: available - days } }];"
+      }
+    },
+    {
+      "id": "b7f46957-76b9-46eb-8549-92f0cec94895",
+      "name": "Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        500
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.eligible }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "04e34fc7-44d9-4cc2-b9ee-217679397ace",
+      "name": "Mark Pending",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1780,
+        500
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "request_id"
+          ],
+          "value": {
+            "request_id": "={{ $('Validate and Count Days').first().json.request_id }}",
+            "employee_name": "={{ $('Validate and Count Days').first().json.employee_name }}",
+            "manager_email": "={{ $('Validate and Count Days').first().json.manager_email }}",
+            "days": "={{ $('Validate and Count Days').first().json.days }}",
+            "status": "Pending"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leave_type",
+              "displayName": "leave_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_portion",
+              "displayName": "day_portion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "1098522d-b308-4de8-bcbb-7816b7f027b6",
+      "name": "Email Employee Received",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2020,
+        500
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Validate and Count Days').first().json.to_employee }}",
+        "subject": "={{ $('Validate and Count Days').first().json.subject_prefix }}Leave request received",
+        "emailType": "text",
+        "message": "=Hi {{ $('Validate and Count Days').first().json.employee_name }},\n\nYour request has gone to your manager.\n\nType: {{ $('Validate and Count Days').first().json.leave_type }}\nDates: {{ $('Validate and Count Days').first().json.start_date }} to {{ $('Validate and Count Days').first().json.end_date }}\nWorking days: {{ $('Validate and Count Days').first().json.days }}\nReference: {{ $('Validate and Count Days').first().json.request_id }}\n\nKind regards,\n{{ $('Config').first().json.company_name }} HR",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "2d480e88-4fe0-41f7-b3f2-0ce2c40ddd5f",
+      "name": "Ask Manager to Approve",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2260,
+        500
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAndWait",
+        "sendTo": "={{ $('Validate and Count Days').first().json.to_manager }}",
+        "subject": "={{ $('Validate and Count Days').first().json.subject_prefix }}Leave approval needed: {{ $('Validate and Count Days').first().json.employee_name }}",
+        "message": "=Employee: {{ $('Validate and Count Days').first().json.employee_name }}\nType: {{ $('Validate and Count Days').first().json.leave_type }}\nDates: {{ $('Validate and Count Days').first().json.start_date }} to {{ $('Validate and Count Days').first().json.end_date }}\nWorking days: {{ $('Validate and Count Days').first().json.days }}\nBalance left after approval: {{ $('Validate and Count Days').first().json.available_after }}\nReason: {{ $('Validate and Count Days').first().json.reason }}",
+        "responseType": "approval",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approve",
+            "disapproveLabel": "Decline"
+          }
+        },
+        "options": {
+          "appendAttribution": false,
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": 3,
+              "resumeUnit": "days"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "b369243e-4d5d-4027-a862-d7b527167118",
+      "name": "Manager Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2500,
+        500
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Approved",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data?.approved === true }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "Declined",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data?.approved === false }}",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No Response"
+        }
+      }
+    },
+    {
+      "id": "be5c80c6-ac59-4ec0-8218-d06d9f00f97f",
+      "name": "Read Latest Balance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2740,
+        260
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Employees"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "employee_id",
+              "lookupValue": "={{ $('Validate and Count Days').first().json.employee_id }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d355ffc6-9395-448c-acc6-2400e82e5170",
+      "name": "Deduct Balance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2980,
+        260
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Employees"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "employee_id"
+          ],
+          "value": {
+            "employee_id": "={{ $json.employee_id }}",
+            "annual_leave": "={{ Number($json.annual_leave) - ($('Validate and Count Days').first().json.leave_type === 'Annual Leave' ? $('Validate and Count Days').first().json.days : 0) }}",
+            "sick_leave": "={{ Number($json.sick_leave) - ($('Validate and Count Days').first().json.leave_type === 'Sick Leave' ? $('Validate and Count Days').first().json.days : 0) }}",
+            "childcare_leave": "={{ Number($json.childcare_leave) - ($('Validate and Count Days').first().json.leave_type === 'Childcare Leave' ? $('Validate and Count Days').first().json.days : 0) }}"
+          },
+          "schema": [
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "annual_leave",
+              "displayName": "annual_leave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sick_leave",
+              "displayName": "sick_leave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "childcare_leave",
+              "displayName": "childcare_leave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "d3012550-8df2-4147-bfe7-065383fde3a8",
+      "name": "Mark Approved",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3220,
+        260
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "request_id"
+          ],
+          "value": {
+            "request_id": "={{ $('Validate and Count Days').first().json.request_id }}",
+            "status": "Approved",
+            "decided_at": "={{ $now.setZone('Asia/Singapore').toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leave_type",
+              "displayName": "leave_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_portion",
+              "displayName": "day_portion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "ff1c398a-946b-44cd-8896-d589ec525330",
+      "name": "Email Employee Approved",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3460,
+        260
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Validate and Count Days').first().json.to_employee }}",
+        "subject": "={{ $('Validate and Count Days').first().json.subject_prefix }}Leave approved",
+        "emailType": "text",
+        "message": "=Hi {{ $('Validate and Count Days').first().json.employee_name }},\n\nYour {{ $('Validate and Count Days').first().json.leave_type }} from {{ $('Validate and Count Days').first().json.start_date }} to {{ $('Validate and Count Days').first().json.end_date }} has been approved.\n\nReference: {{ $('Validate and Count Days').first().json.request_id }}\n\nKind regards,\n{{ $('Config').first().json.company_name }} HR",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "ebbfb25f-9f7c-455e-a680-b87522e0f556",
+      "name": "Mark Declined",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2740,
+        500
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "request_id"
+          ],
+          "value": {
+            "request_id": "={{ $('Validate and Count Days').first().json.request_id }}",
+            "status": "Declined",
+            "decision_reason": "Declined by manager",
+            "decided_at": "={{ $now.setZone('Asia/Singapore').toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leave_type",
+              "displayName": "leave_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_portion",
+              "displayName": "day_portion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "3b6364fa-9d41-4cec-8370-f9066a62292e",
+      "name": "Email Employee Declined",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2980,
+        500
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Validate and Count Days').first().json.to_employee }}",
+        "subject": "={{ $('Validate and Count Days').first().json.subject_prefix }}Leave declined",
+        "emailType": "text",
+        "message": "=Hi {{ $('Validate and Count Days').first().json.employee_name }},\n\nYour manager has declined your {{ $('Validate and Count Days').first().json.leave_type }} from {{ $('Validate and Count Days').first().json.start_date }} to {{ $('Validate and Count Days').first().json.end_date }}. Please speak with them if you have questions.\n\nReference: {{ $('Validate and Count Days').first().json.request_id }}\n\nKind regards,\n{{ $('Config').first().json.company_name }} HR",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "7ed28bb8-d2a8-4e92-945c-606fa15d56c9",
+      "name": "Mark No Response",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2740,
+        740
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "request_id"
+          ],
+          "value": {
+            "request_id": "={{ $('Validate and Count Days').first().json.request_id }}",
+            "status": "No Response",
+            "decision_reason": "Manager did not respond within 3 days"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leave_type",
+              "displayName": "leave_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_portion",
+              "displayName": "day_portion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "eb9648c1-7c64-47cf-9936-0e68446e4dab",
+      "name": "Email HR No Response",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2980,
+        740
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Validate and Count Days').first().json.to_hr }}",
+        "subject": "={{ $('Validate and Count Days').first().json.subject_prefix }}Leave request needs follow-up: {{ $('Validate and Count Days').first().json.request_id }}",
+        "emailType": "text",
+        "message": "=The manager did not respond within 3 days. Please follow up.\n\nEmployee: {{ $('Validate and Count Days').first().json.employee_name }}\nManager: {{ $('Validate and Count Days').first().json.manager_email }}\nType: {{ $('Validate and Count Days').first().json.leave_type }}\nDates: {{ $('Validate and Count Days').first().json.start_date }} to {{ $('Validate and Count Days').first().json.end_date }}\nReference: {{ $('Validate and Count Days').first().json.request_id }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "803a1e20-1e3e-4336-b6f8-88bdc26371ab",
+      "name": "Mark Rejected",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1780,
+        760
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Requests"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "request_id"
+          ],
+          "value": {
+            "request_id": "={{ $('Validate and Count Days').first().json.request_id }}",
+            "employee_name": "={{ $('Validate and Count Days').first().json.employee_name }}",
+            "manager_email": "={{ $('Validate and Count Days').first().json.manager_email }}",
+            "days": "={{ $('Validate and Count Days').first().json.days }}",
+            "status": "Rejected",
+            "decision_reason": "={{ $('Validate and Count Days').first().json.decision_reason }}",
+            "decided_at": "={{ $now.setZone('Asia/Singapore').toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "submitted_at",
+              "displayName": "submitted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "work_email",
+              "displayName": "work_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "manager_email",
+              "displayName": "manager_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leave_type",
+              "displayName": "leave_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_portion",
+              "displayName": "day_portion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      }
+    },
+    {
+      "id": "d9c79668-972b-4601-a902-bcde31046d89",
+      "name": "Email Employee Rejected",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2020,
+        760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Validate and Count Days').first().json.to_employee }}",
+        "subject": "={{ $('Validate and Count Days').first().json.subject_prefix }}Leave request not accepted",
+        "emailType": "text",
+        "message": "=Hello,\n\nYour leave request could not be accepted.\n\nReason: {{ $('Validate and Count Days').first().json.decision_reason }}\n\nReference: {{ $('Validate and Count Days').first().json.request_id }}\n\nKind regards,\n{{ $('Config').first().json.company_name }} HR",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "eb95b2ec-71b8-4870-b9ea-b7c1bd349766",
+      "name": "Sticky Note 91d6db65",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -420
+      ],
+      "parameters": {
+        "content": "## Automation 01: Leave Application and Balance Check\n\n### Introduction\nChecks each leave request against company records, asks the manager to approve eligible requests and updates the balance. No AI is used.\n\n### What to key in\nThe employee fills in **Leave Form**: Employee ID, Work Email, Leave Type, Start Date, End Date, Day Portion and Reason.\nHR keeps the **Employees** tab (names, emails, manager, balances) and the **Holidays** tab (one date per row, updated yearly).\n\n### What happens next\n1. Identity and dates are checked.\n2. Working days are counted, leaving out weekends and public holidays.\n3. Overlapping requests and pending leave are taken into account.\n4. Not eligible: the employee gets the reason by email.\n5. Eligible: the manager gets Approve and Decline buttons.\n6. Approved: the balance is deducted and the employee is told.\n7. Declined: the employee is told.\n8. No answer in 3 days: HR is told, and the balance stays the same.\n\n### Setup\n1. Create a Basic Auth credential for **Leave Form**. Staff use this password to open the form.\n2. Connect your Gmail account in all six Gmail nodes.\n3. In **Config**, enter hr_email and company_name.\n4. Test with test_mode on, which sends every email to test_email.\n5. For live use, set test_mode to false and publish.\n6. Share the Production URL from **Leave Form** with staff.",
+        "color": 4,
+        "width": 700,
+        "height": 860
+      }
+    }
+  ],
+  "connections": {
+    "Leave Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Log Raw Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Raw Submission": {
+      "main": [
+        [
+          {
+            "node": "Read Employees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Employees": {
+      "main": [
+        [
+          {
+            "node": "Read Holidays",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Holidays": {
+      "main": [
+        [
+          {
+            "node": "Read Leave Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Leave Requests": {
+      "main": [
+        [
+          {
+            "node": "Validate and Count Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Count Days": {
+      "main": [
+        [
+          {
+            "node": "Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible?": {
+      "main": [
+        [
+          {
+            "node": "Mark Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Pending": {
+      "main": [
+        [
+          {
+            "node": "Email Employee Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Employee Received": {
+      "main": [
+        [
+          {
+            "node": "Ask Manager to Approve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Manager to Approve": {
+      "main": [
+        [
+          {
+            "node": "Manager Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager Decision": {
+      "main": [
+        [
+          {
+            "node": "Read Latest Balance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Declined",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark No Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest Balance": {
+      "main": [
+        [
+          {
+            "node": "Deduct Balance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduct Balance": {
+      "main": [
+        [
+          {
+            "node": "Mark Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Approved": {
+      "main": [
+        [
+          {
+            "node": "Email Employee Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Declined": {
+      "main": [
+        [
+          {
+            "node": "Email Employee Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark No Response": {
+      "main": [
+        [
+          {
+            "node": "Email HR No Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Rejected": {
+      "main": [
+        [
+          {
+            "node": "Email Employee Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Singapore"
+  },
+  "pinData": {}
+}
